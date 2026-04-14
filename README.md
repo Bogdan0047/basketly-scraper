@@ -1,5 +1,7 @@
 # Savvy Shopper Scraper Service
 
+trigger redeploy
+
 Production-grade browser-rendered scraping for JS-heavy UK supermarkets.
 
 ## Supported Retailers
