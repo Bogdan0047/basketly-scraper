@@ -1,13 +1,12 @@
-const scrapeSainsburys = require('./scrapers/sainsburys');
+const sainsburys = require("./scrapers/sainsburys");
 
 async function scrape(retailer, query) {
   console.log("SCRAPE CALLED:", retailer, query);
 
-  if (retailer === 'sainsburys') {
-    return await scrapeSainsburys(query);
+  if (retailer === "sainsburys") {
+    return await sainsburys.search(query);
   }
 
-  console.log("Retailer not supported:", retailer);
   return [];
 }
 
