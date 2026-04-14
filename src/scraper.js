@@ -1,3 +1,5 @@
+const scrapeSainsburys = require('./scrapers/sainsburys');
+
 async function scrape(retailer, query) {
   console.log("SCRAPE CALLED:", retailer, query);
 
