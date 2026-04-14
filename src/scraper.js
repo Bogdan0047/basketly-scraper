@@ -11,3 +11,6 @@ async function scrape(retailer, query) {
 }
 
 module.exports = { scrape };
+
+console.log("SCRAPE CALLED:", retailer, query);
+console.log("USING SAINSBURYS ROUTE");
