@@ -3,7 +3,11 @@ const scrapeSainsburys = require('./scrapers/sainsburys');
 async function scrape(retailer, query) {
   console.log("SCRAPE CALLED:", retailer, query);
 
-  // TEMP SAFE RETURN (prevents crashes)
+  if (retailer === 'sainsburys') {
+    return await scrapeSainsburys(query);
+  }
+
+  console.log("Retailer not supported:", retailer);
   return [];
 }
 
