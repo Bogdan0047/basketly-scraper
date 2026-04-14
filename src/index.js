@@ -1,40 +1,8 @@
 const express = require("express");
+const { scrape } = require("./scraper");
 
 const app = express();
 app.use(express.json());
-
-const { scrape } = require("./scraper");
-
-app.get("/scrape", async (req, res) => {
-  const retailer = String(req.query.retailer || "").toLowerCase().trim();
-  const query = String(req.query.query || "").trim();
-
-  if (!retailer || !query) {
-    return res.status(400).json({
-      ok: false,
-      error: "Missing retailer or query",
-    });
-  }
-
-  try {
-    const results = await scrape(retailer, query);
-
-    return res.json({
-      ok: true,
-      retailer,
-      query,
-      count: Array.isArray(results) ? results.length : 0,
-      results: Array.isArray(results) ? results : [],
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      retailer,
-      query,
-      error: error.message || "Scrape failed",
-    });
-  }
-});
 
 app.get("/", (_req, res) => {
   res.json({ ok: true, message: "Basketly scraper running" });
@@ -55,17 +23,8 @@ app.get("/scrape", async (req, res) => {
     });
   }
 
-  const scraper = scrapers[retailer];
-
-  if (!scraper || typeof scraper.search !== "function") {
-    return res.status(400).json({
-      ok: false,
-      error: `Unsupported retailer: ${retailer}`,
-    });
-  }
-
   try {
-    const results = await scraper.search(query);
+    const results = await scrape(retailer, query);
 
     return res.json({
       ok: true,
@@ -95,17 +54,8 @@ app.post("/scrape", async (req, res) => {
     });
   }
 
-  const scraper = scrapers[retailer];
-
-  if (!scraper || typeof scraper.search !== "function") {
-    return res.status(400).json({
-      ok: false,
-      error: `Unsupported retailer: ${retailer}`,
-    });
-  }
-
   try {
-    const results = await scraper.search(query);
+    const results = await scrape(retailer, query);
 
     return res.json({
       ok: true,
