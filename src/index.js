@@ -1,5 +1,3 @@
-console.log("🔥 VERSION 2 ACTIVE");
-
 const express = require("express");
 const sainsburys = require("./scrapers/sainsburys");
 
@@ -33,12 +31,12 @@ app.get("/scrape", async (req, res) => {
     if (retailer === "sainsburys") {
       console.log("[INDEX] calling sainsburys.search()");
       results = await sainsburys.search(query);
-      console.log("[INDEX] sainsburys returned", Array.isArray(results) ? results.length : "not-array");
+      console.log(
+        "[INDEX] sainsburys returned",
+        Array.isArray(results) ? results.length : "not-array"
+      );
     } else {
-      return res.status(400).json({
-        ok: false,
-        error: `Unsupported retailer: ${retailer}`,
-      });
+      console.log("[INDEX] retailer not supported yet:", retailer);
     }
 
     return res.json({
@@ -48,14 +46,14 @@ app.get("/scrape", async (req, res) => {
       count: Array.isArray(results) ? results.length : 0,
       results: Array.isArray(results) ? results : [],
     });
-  } catch (error) {
-    console.error("[INDEX] scrape failed:", error.message);
-
+  } catch (err) {
+    console.error("[INDEX] scrape route error:", err.message);
     return res.status(500).json({
       ok: false,
       retailer,
       query,
-      error: error.message || "Unknown scrape error",
+      error: err.message,
+      results: [],
     });
   }
 });
