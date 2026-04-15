@@ -1,3 +1,4 @@
+console.log("🔥 NEW VERSION LOADED");
 const express = require("express");
 const sainsburys = require("./scrapers/sainsburys");
 
