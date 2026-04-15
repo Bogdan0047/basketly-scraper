@@ -5,6 +5,7 @@ module.exports.search = async function (query) {
   console.log("[SAINSBURYS] SCRAPING URL:", url);
 
   let browser;
+
   try {
     browser = await chromium.launch({
       headless: true,
@@ -26,15 +27,21 @@ module.exports.search = async function (query) {
     });
 
     const page = await context.newPage();
-    await page.route("**/*.{mp4,webm,woff2,ttf}", (r) => r.abort());
+
+    await page.route("**/*.{png,jpg,jpeg,gif,svg,mp4,webm,woff,woff2,ttf}", (route) =>
+      route.abort()
+    );
 
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
-    await page.waitForLoadState("networkidle").catch(() => {
-      console.log("[SAINSBURYS] networkidle timed out, continuing...");
-    });
+
+    try {
+      await page.waitForLoadState("networkidle", { timeout: 10000 });
+    } catch (_) {
+      console.log("[SAINSBURYS] networkidle timeout, continuing");
+    }
+
     await page.waitForTimeout(3000);
 
-    // Cookie banner
     try {
       await page.click(
         '#onetrust-accept-btn-handler, button:has-text("Accept All"), button:has-text("Accept all cookies"), button:has-text("Accept")',
@@ -46,62 +53,65 @@ module.exports.search = async function (query) {
       console.log("[SAINSBURYS] No cookie banner found");
     }
 
-    // Scroll to trigger lazy content
     for (let i = 0; i < 3; i++) {
-      await page.evaluate(() => window.scrollBy(0, 600));
-      await page.waitForTimeout(1500);
+      await page.evaluate(() => window.scrollBy(0, 700));
+      await page.waitForTimeout(1200);
     }
 
-    // Debug
-    const title = await page.title().catch(() => "UNKNOWN");
-    console.log("[SAINSBURYS] PAGE TITLE:", title);
+    const pageTitle = await page.title().catch(() => "UNKNOWN");
+    console.log("[SAINSBURYS] PAGE TITLE:", pageTitle);
 
-    const textPreview = await page
-      .evaluate(() => document.body.innerText.substring(0, 300))
-      .catch(() => "FAILED TO GET TEXT");
-    console.log("[SAINSBURYS] PAGE TEXT PREVIEW:", textPreview);
+    const pageTextPreview = await page
+      .evaluate(() => document.body.innerText.slice(0, 1000))
+      .catch(() => "FAILED TO READ PAGE TEXT");
+    console.log("[SAINSBURYS] PAGE TEXT PREVIEW:", pageTextPreview);
 
-    // Block detection
-    const lowerText = (textPreview || "").toLowerCase();
+    const lower = String(pageTextPreview || "").toLowerCase();
     if (
-      lowerText.includes("access denied") ||
-      lowerText.includes("captcha") ||
-      lowerText.includes("robot") ||
-      lowerText.includes("blocked") ||
-      lowerText.includes("unusual traffic")
+      lower.includes("access denied") ||
+      lower.includes("captcha") ||
+      lower.includes("robot") ||
+      lower.includes("blocked") ||
+      lower.includes("unusual traffic")
     ) {
       console.log("[SAINSBURYS] POSSIBLE BLOCK DETECTED");
       await browser.close();
       return [];
     }
 
-    // Debug selectors
-    const CARD_SELECTORS = [
-      '[data-testid="product-tile"]',
-      'li[data-testid="search-product"]',
-      ".pt__content",
-      ".product-tile",
-      'li[class*="pt-grid"]',
-      'li[class*="pt__"]',
-    ];
-    for (const sel of CARD_SELECTORS) {
-      const count = await page.locator(sel).count();
-      console.log(`[SAINSBURYS] Selector "${sel}": ${count} matches`);
-    }
+    const selectorCounts = await page.evaluate(() => {
+      const selectors = [
+        '[data-testid="product-tile"]',
+        '[data-testid="search-product"]',
+        '.pt__content',
+        '.product-tile',
+        'li[class*="pt-grid"]',
+        'li[class*="pt__"]',
+        'a[href*="/products/"]',
+      ];
 
-    // Extract products
+      const out = {};
+      for (const sel of selectors) {
+        out[sel] = document.querySelectorAll(sel).length;
+      }
+      return out;
+    });
+
+    console.log("[SAINSBURYS] SELECTOR COUNTS:", JSON.stringify(selectorCounts));
+
     const products = await page.evaluate(() => {
       const results = [];
+
       const cards = document.querySelectorAll(
-        '[data-testid="product-tile"], li[data-testid="search-product"], .pt__content, .product-tile, li[class*="pt-grid"], li[class*="pt__"]'
+        '[data-testid="product-tile"], [data-testid="search-product"], .pt__content, .product-tile, li[class*="pt-grid"], li[class*="pt__"]'
       );
 
       cards.forEach((card) => {
         try {
           const titleEl =
             card.querySelector('[data-testid="product-title"]') ||
-            card.querySelector('[data-testid="product-tile-title"]') ||
-            card.querySelector('[data-test-id="product-tile-description"] a') ||
+            card.querySelector('[data-testid="product-title-title"]') ||
+            card.querySelector('[data-test-id="product-title-description"] a') ||
             card.querySelector(".pt__info__description a") ||
             card.querySelector("h2 a") ||
             card.querySelector("h3 a") ||
@@ -110,7 +120,7 @@ module.exports.search = async function (query) {
             card.querySelector('a[href*="/products/"]');
 
           const title = titleEl?.textContent?.trim();
-          if (!title || title.length < 3) return;
+          if (!title || title.length < 2) return;
 
           const priceEl =
             card.querySelector('[data-testid="price-per-item"]') ||
@@ -123,44 +133,44 @@ module.exports.search = async function (query) {
             );
 
           const priceText = priceEl?.textContent?.trim() || "";
-          const priceMatch = priceText.replace(/,/g, "").match(/(\d+(?:\.\d{1,2})?)/);
-          const price = priceMatch ? parseFloat(priceMatch[1]) : null;
-          if (!price || isNaN(price)) return;
+          const match = priceText.replace(/,/g, "").match(/(\d+(?:\.\d{1,2})?)/);
+          const price = match ? parseFloat(match[1]) : null;
+          if (!price || Number.isNaN(price)) return;
 
           const unitEl =
             card.querySelector('[data-test-id="pt-unit-price"]') ||
             card.querySelector('[data-testid="unit-price"]') ||
             card.querySelector(".pt__cost__unit-price");
-          const unitPrice = unitEl?.textContent?.trim() || null;
 
           const nectarEl =
             card.querySelector('[data-test-id="pt-nectar-price"]') ||
             card.querySelector('[data-testid="nectar-price"]') ||
             card.querySelector(".nectar-price");
-          const nectarText = nectarEl?.textContent?.trim() || null;
 
           const promoEl =
             card.querySelector('[data-testid="promotion"]') ||
             card.querySelector(".promotion-message") ||
             card.querySelector(".pt__promo");
-          const promoText = promoEl?.textContent?.trim() || null;
-
-          let finalPromo = promoText;
-          if (nectarText) {
-            finalPromo = nectarText + (promoText ? " | " + promoText : "");
-          }
 
           const imgEl =
             card.querySelector('img[src*="sainsburys"]') ||
             card.querySelector('img[src*="digitalcontent"]') ||
             card.querySelector("img");
-          let imageUrl = imgEl?.getAttribute("src") || imgEl?.getAttribute("data-src") || null;
-          if (imageUrl && imageUrl.startsWith("//")) imageUrl = "https:" + imageUrl;
+
+          let imageUrl =
+            imgEl?.getAttribute("src") ||
+            imgEl?.getAttribute("data-src") ||
+            null;
+
+          if (imageUrl && imageUrl.startsWith("//")) {
+            imageUrl = "https:" + imageUrl;
+          }
 
           const linkEl =
             card.querySelector('a[href*="/products/"]') ||
             card.querySelector('a[href*="/gol-ui/"]') ||
             card.querySelector("a");
+
           let productUrl = linkEl?.getAttribute("href") || null;
           if (productUrl && !productUrl.startsWith("http")) {
             productUrl = "https://www.sainsburys.co.uk" + productUrl;
@@ -170,8 +180,11 @@ module.exports.search = async function (query) {
             title,
             price,
             price_text: priceText,
-            unit_price: unitPrice,
-            promo_text: finalPromo,
+            unit_price: unitEl?.textContent?.trim() || null,
+            promo_text:
+              nectarEl?.textContent?.trim() ||
+              promoEl?.textContent?.trim() ||
+              null,
             brand: null,
             size: null,
             image_url: imageUrl,
@@ -189,6 +202,7 @@ module.exports.search = async function (query) {
 
     await browser.close();
     browser = null;
+
     return products;
   } catch (err) {
     console.error("[SAINSBURYS] FATAL ERROR:", err.message);
