@@ -1,4 +1,4 @@
-console.log("🚀 NEW VERSION RUNNING");
+console.log("🔥 VERSION 2 ACTIVE");
 
 const express = require("express");
 const sainsburys = require("./scrapers/sainsburys");
