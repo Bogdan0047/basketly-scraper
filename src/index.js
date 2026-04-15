@@ -24,7 +24,20 @@ app.get("/scrape", async (req, res) => {
   }
 
   try {
-    const results = await scrape(retailer, query);
+    console.log("[INDEX] retailer =", retailer, "| query =", query);
+
+    let results = [];
+
+    if (retailer === "sainsburys") {
+      console.log("[INDEX] calling sainsburys.search()");
+      results = await sainsburys.search(query);
+      console.log("[INDEX] sainsburys returned", Array.isArray(results) ? results.length : "not-array");
+    } else {
+      return res.status(400).json({
+        ok: false,
+        error: `Unsupported retailer: ${retailer}`,
+      });
+    }
 
     return res.json({
       ok: true,
@@ -34,6 +47,8 @@ app.get("/scrape", async (req, res) => {
       results: Array.isArray(results) ? results : [],
     });
   } catch (error) {
+    console.error("[INDEX] scrape failed:", error.message);
+
     return res.status(500).json({
       ok: false,
       retailer,
@@ -41,43 +56,4 @@ app.get("/scrape", async (req, res) => {
       error: error.message || "Unknown scrape error",
     });
   }
-});
-
-app.post("/scrape", async (req, res) => {
-  const retailer = String(req.body?.retailer || "").toLowerCase().trim();
-  const query = String(req.body?.query || req.body?.search_term || "").trim();
-
-  if (!retailer || !query) {
-    return res.status(400).json({
-      ok: false,
-      error: "Missing retailer or query",
-    });
-  }
-
-  try {
-    const results = await scrape(retailer, query);
-
-    return res.json({
-      ok: true,
-      retailer,
-      query,
-      count: Array.isArray(results) ? results.length : 0,
-      results: Array.isArray(results) ? results : [],
-    });
-  } catch (error) {
-    return res.status(500).json({
-      ok: false,
-      retailer,
-      query,
-      error: error.message || "Unknown scrape error",
-    });
-  }
-});
-
-app.get("/", (req, res) => {
-  res.send("OK");
-});
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on port ${PORT}`);
 });
