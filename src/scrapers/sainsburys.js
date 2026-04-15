@@ -1,6 +1,9 @@
 const { chromium } = require("playwright");
+console.log("🔥 SAINSBURYS FILE LOADED");
 
 module.exports.search = async function (query) {
+  console.log("🔥 SAINSBURYS SEARCH START:", query);
+
   const url = `https://www.sainsburys.co.uk/gol-ui/SearchResults/${encodeURIComponent(query)}`;
   console.log("[SAINSBURYS] SCRAPING URL:", url);
 
